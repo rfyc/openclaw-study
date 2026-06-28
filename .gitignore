@@ -145,7 +145,10 @@ USER.md
 /local/
 /client_secret_*.json
 package-lock.json
-.claude/
+.claude/*
+!.claude/chat-history/
+!.claude/chat-history/**
+!.claude/restore-history.sh
 .agent/
 skills-lock.json
 
