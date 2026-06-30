@@ -17,6 +17,7 @@ import { commandsHandlers } from "./server-methods/commands.js";
 import { configHandlers } from "./server-methods/config.js";
 import { connectHandlers } from "./server-methods/connect.js";
 import { cronHandlers } from "./server-methods/cron.js";
+import { debugCaptureHandlers } from "./server-methods/debug-capture.js";
 import { deviceHandlers } from "./server-methods/devices.js";
 import { diagnosticsHandlers } from "./server-methods/diagnostics.js";
 import { doctorHandlers } from "./server-methods/doctor.js";
@@ -79,6 +80,7 @@ function authorizeGatewayMethod(method: string, client: GatewayRequestOptions["c
 
 export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...connectHandlers,
+  ...debugCaptureHandlers,
   ...logsHandlers,
   ...voicewakeHandlers,
   ...voicewakeRoutingHandlers,

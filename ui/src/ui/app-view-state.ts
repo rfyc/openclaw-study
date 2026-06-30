@@ -96,6 +96,11 @@ export type AppViewState = {
   chatStream: string | null;
   chatStreamStartedAt: number | null;
   chatRunId: string | null;
+  debugFrames: Array<{ direction: "out" | "in"; ts: number; data: unknown }>;
+  debugModalOpen: boolean;
+  debugCaptureEvents: unknown[];
+  debugCaptureLoading: boolean;
+  debugCaptureError: string | null;
   chatSideResult: ChatSideResult | null;
   chatSideResultTerminalRuns: Set<string>;
   compactionStatus: CompactionStatus | null;

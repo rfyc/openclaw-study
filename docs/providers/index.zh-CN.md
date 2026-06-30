@@ -1,0 +1,101 @@
+---
+summary: "OpenClaw 支持的模型提供商（LLMs）"
+read_when:
+  - 您想选择模型提供商
+  - 您需要快速了解支持的 LLM 后端
+title: "提供商目录"
+---
+
+# 模型提供商
+
+OpenClaw 可以使用众多 LLM 提供商。选择一个提供商，完成认证，然后将默认模型设置为 `provider/model`。
+
+需要聊天频道文档（WhatsApp/Telegram/Discord/Slack/Mattermost（插件）等）？请参见[频道](/channels)。
+
+## 快速开始
+
+1. 向提供商进行认证（通常通过 `openclaw onboard`）。
+2. 设置默认模型：
+
+```json5
+{
+  agents: { defaults: { model: { primary: "anthropic/claude-opus-4-6" } } },
+}
+```
+
+## 提供商文档
+
+- [阿里巴巴模型工作室](/providers/alibaba)
+- [Amazon Bedrock](/providers/bedrock)
+- [Amazon Bedrock Mantle](/providers/bedrock-mantle)
+- [Anthropic（API + Claude CLI）](/providers/anthropic)
+- [Arcee AI（Trinity 模型）](/providers/arcee)
+- [Azure Speech](/providers/azure-speech)
+- [BytePlus（国际版）](/concepts/model-providers#byteplus-international)
+- [Cerebras](/providers/cerebras)
+- [Chutes](/providers/chutes)
+- [Cloudflare AI Gateway](/providers/cloudflare-ai-gateway)
+- [ComfyUI](/providers/comfy)
+- [DeepSeek](/providers/deepseek)
+- [ElevenLabs](/providers/elevenlabs)
+- [fal](/providers/fal)
+- [Fireworks](/providers/fireworks)
+- [GitHub Copilot](/providers/github-copilot)
+- [GLM 模型](/providers/glm)
+- [Google（Gemini）](/providers/google)
+- [Gradium](/providers/gradium)
+- [Groq（LPU 推理）](/providers/groq)
+- [Hugging Face（推理）](/providers/huggingface)
+- [inferrs（本地模型）](/providers/inferrs)
+- [Kilocode](/providers/kilocode)
+- [LiteLLM（统一网关）](/providers/litellm)
+- [LM Studio（本地模型）](/providers/lmstudio)
+- [MiniMax](/providers/minimax)
+- [Mistral](/providers/mistral)
+- [Moonshot AI（Kimi + Kimi Coding）](/providers/moonshot)
+- [NVIDIA](/providers/nvidia)
+- [Ollama（云端 + 本地模型）](/providers/ollama)
+- [OpenAI（API + Codex）](/providers/openai)
+- [OpenCode](/providers/opencode)
+- [OpenCode Go](/providers/opencode-go)
+- [OpenRouter](/providers/openrouter)
+- [Perplexity（网络搜索）](/providers/perplexity-provider)
+- [Qianfan](/providers/qianfan)
+- [Qwen 云](/providers/qwen)
+- [Runway](/providers/runway)
+- [SenseAudio](/providers/senseaudio)
+- [SGLang（本地模型）](/providers/sglang)
+- [StepFun](/providers/stepfun)
+- [Synthetic](/providers/synthetic)
+- [腾讯云（TokenHub）](/providers/tencent)
+- [Together AI](/providers/together)
+- [Venice（Venice AI，注重隐私）](/providers/venice)
+- [Vercel AI Gateway](/providers/vercel-ai-gateway)
+- [vLLM（本地模型）](/providers/vllm)
+- [火山引擎（豆包）](/providers/volcengine)
+- [Vydra](/providers/vydra)
+- [xAI](/providers/xai)
+- [小米](/providers/xiaomi)
+- [Z.AI](/providers/zai)
+
+## 共享概述页面
+
+- [其他内置变体](/providers/models#additional-bundled-provider-variants) - Anthropic Vertex、Copilot Proxy 和 Gemini CLI OAuth
+- [图像生成](/tools/image-generation) - 共享 `image_generate` 工具、提供商选择和故障转移
+- [音乐生成](/tools/music-generation) - 共享 `music_generate` 工具、提供商选择和故障转移
+- [视频生成](/tools/video-generation) - 共享 `video_generate` 工具、提供商选择和故障转移
+
+## 转录提供商
+
+- [Deepgram（音频转录）](/providers/deepgram)
+- [ElevenLabs](/providers/elevenlabs#speech-to-text)
+- [Mistral](/providers/mistral#audio-transcription-voxtral)
+- [OpenAI](/providers/openai#speech-to-text)
+- [SenseAudio](/providers/senseaudio)
+- [xAI](/providers/xai#speech-to-text)
+
+## 社区工具
+
+- [Claude Max API 代理](/providers/claude-max-api-proxy) - 用于 Claude 订阅凭据的社区代理（使用前请验证 Anthropic 政策/条款）
+
+有关完整提供商目录（xAI、Groq、Mistral 等）和高级配置，请参见[模型提供商](/concepts/model-providers)。

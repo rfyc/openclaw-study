@@ -1,0 +1,1212 @@
+---
+summary: "网关配置参考，涵盖核心 OpenClaw 键、默认值及专用子系统参考的链接"
+title: "配置参考"
+read_when:
+  - 需要精确的字段级配置语义或默认值
+  - 正在验证渠道、模型、网关或工具配置块
+---
+
+`~/.openclaw/openclaw.json` 的核心配置参考。有关面向任务的概述，请参阅[配置](/gateway/configuration)。
+
+涵盖主要 OpenClaw 配置面，并在子系统有自己更深入的参考时提供链接。渠道和插件拥有的命令目录以及深层内存/QMD 旋钮位于其自己的页面，而不是此页面。
+
+代码真相：
+
+- `openclaw config schema` 打印用于验证和 Control UI 的实时 JSON Schema，合并了可用的捆绑/插件/渠道元数据
+- `config.schema.lookup` 返回一个路径范围的模式节点用于下钻工具
+- `pnpm config:docs:check` / `pnpm config:docs:gen` 根据当前模式面验证配置文档基线哈希
+
+代理查找路径：在编辑前使用网关工具操作 `config.schema.lookup` 获取精确的字段级文档和约束。使用[配置](/gateway/configuration)进行面向任务的指导，使用本页获取更广泛的字段映射、默认值以及子系统参考的链接。
+
+专用深度参考：
+
+- [内存配置参考](/reference/memory-config)，用于 `agents.defaults.memorySearch.*`、`memory.qmd.*`、`memory.citations` 以及 `plugins.entries.memory-core.config.dreaming` 下的梦境配置
+- [斜杠命令](/tools/slash-commands)，用于当前内置 + 捆绑命令目录
+- 拥有渠道/插件页面用于渠道特定命令面
+
+配置格式为 **JSON5**（允许注释 + 尾随逗号）。所有字段都是可选的 — 省略时 OpenClaw 使用安全默认值。
+
+---
+
+## 渠道
+
+每渠道配置键已移至专用页面 — 参见[配置 — 渠道](/gateway/config-channels)了解 `channels.*`，包括 Slack、Discord、Telegram、WhatsApp、Matrix、iMessage 和其他捆绑渠道（认证、访问控制、多账户、提及门控）。
+
+## 代理默认值、多代理、会话和消息
+
+已移至专用页面 — 参见[配置 — 代理](/gateway/config-agents)了解：
+
+- `agents.defaults.*`（工作区、模型、思考、心跳、内存、媒体、技能、沙盒）
+- `multiAgent.*`（多代理路由和绑定）
+- `session.*`（会话生命周期、压缩、修剪）
+- `messages.*`（消息传递、TTS、Markdown 渲染）
+- `talk.*`（Talk 模式）
+  - `talk.speechLocale`：可选的 BCP 47 语言区域 id，用于 iOS/macOS 上的 Talk 语音识别
+  - `talk.silenceTimeoutMs`：未设置时，Talk 保持平台默认暂停窗口后再发送转录文本（`macOS 和 Android 上为 700 ms，iOS 上为 900 ms`）
+
+## 工具和自定义提供商
+
+工具策略、实验性开关、提供商支持的工具配置以及自定义提供商/base-URL 设置已移至专用页面 — 参见[配置 — 工具和自定义提供商](/gateway/config-tools)。
+
+## 模型
+
+提供商定义、模型允许列表和自定义提供商设置位于[配置 — 工具和自定义提供商](/gateway/config-tools#custom-providers-and-base-urls)。`models` 根还拥有全局模型目录行为。
+
+```json5
+{
+  models: {
+    // 可选。默认：true。更改时需要网关重启。
+    pricing: { enabled: false },
+  },
+}
+```
+
+- `models.mode`：提供商目录行为（`merge` 或 `replace`）。
+- `models.providers`：以提供商 id 为键的自定义提供商映射。
+- `models.pricing.enabled`：控制在旁路进程和渠道到达网关就绪路径后启动的后台定价引导程序。为 `false` 时，网关跳过 OpenRouter 和 LiteLLM 定价目录抓取；配置的 `models.providers.*.models[].cost` 值仍用于本地成本估算。
+
+## MCP
+
+OpenClaw 管理的 MCP 服务器定义位于 `mcp.servers` 下，由嵌入式 Pi 和其他运行时适配器使用。`openclaw mcp list`、`show`、`set` 和 `unset` 命令在不连接目标服务器的情况下管理此块进行配置编辑。
+
+```json5
+{
+  mcp: {
+    // 可选。默认：600000 ms（10 分钟）。设置 0 禁用空闲驱逐。
+    sessionIdleTtlMs: 600000,
+    servers: {
+      docs: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-fetch"],
+      },
+      remote: {
+        url: "https://example.com/mcp",
+        transport: "streamable-http", // streamable-http | sse
+        headers: {
+          Authorization: "Bearer ${MCP_REMOTE_TOKEN}",
+        },
+      },
+    },
+  },
+}
+```
+
+- `mcp.servers`：为公开配置 MCP 工具的运行时命名的 stdio 或远程 MCP 服务器定义。远程条目使用 `transport: "streamable-http"` 或 `transport: "sse"`；`type: "http"` 是 CLI 原生别名，`openclaw mcp set` 和 `openclaw doctor --fix` 将其规范化为规范的 `transport` 字段。
+- `mcp.sessionIdleTtlMs`：会话范围捆绑 MCP 运行时的空闲 TTL。一次性嵌入运行请求运行结束清理；此 TTL 是长时间运行会话和未来调用者的后备。
+- `mcp.*` 下的更改通过处置缓存的会话 MCP 运行时来热应用。下次工具发现/使用时从新配置重新创建它们，因此删除的 `mcp.servers` 条目立即被回收，而不是等待空闲 TTL。
+
+参见 [MCP](/cli/mcp#openclaw-as-an-mcp-client-registry) 和 [CLI 后端](/gateway/cli-backends#bundle-mcp-overlays)了解运行时行为。
+
+## 技能
+
+```json5
+{
+  skills: {
+    allowBundled: ["gemini", "peekaboo"],
+    load: {
+      extraDirs: ["~/Projects/agent-scripts/skills"],
+    },
+    install: {
+      preferBrew: true,
+      nodeManager: "npm", // npm | pnpm | yarn | bun
+    },
+    entries: {
+      "image-lab": {
+        apiKey: { source: "env", provider: "default", id: "GEMINI_API_KEY" }, // 或纯文本字符串
+        env: { GEMINI_API_KEY: "GEMINI_KEY_HERE" },
+      },
+      peekaboo: { enabled: true },
+      sag: { enabled: false },
+    },
+  },
+}
+```
+
+- `allowBundled`：仅捆绑技能的可选允许列表（托管/工作区技能不受影响）。
+- `load.extraDirs`：额外的共享技能根目录（最低优先级）。
+- `install.preferBrew`：为 `true` 时，当 `brew` 可用时优先使用 Homebrew 安装程序，然后再回退到其他安装程序类型。
+- `install.nodeManager`：`metadata.openclaw.install` 规范的节点安装程序偏好（`npm` | `pnpm` | `yarn` | `bun`）。
+- `entries.<skillKey>.enabled: false` 禁用技能，即使已捆绑/安装。
+- `entries.<skillKey>.apiKey`：为声明主要环境变量的技能提供便利（纯文本字符串或 SecretRef 对象）。
+
+---
+
+## 插件
+
+```json5
+{
+  plugins: {
+    enabled: true,
+    allow: ["voice-call"],
+    deny: [],
+    load: {
+      paths: ["~/Projects/oss/voice-call-plugin"],
+    },
+    entries: {
+      "voice-call": {
+        enabled: true,
+        hooks: {
+          allowPromptInjection: false,
+        },
+        config: { provider: "twilio" },
+      },
+    },
+  },
+}
+```
+
+- 从 `~/.openclaw/extensions`、`<workspace>/.openclaw/extensions` 加载，以及 `plugins.load.paths`。
+- 发现接受原生 OpenClaw 插件以及兼容的 Codex 捆绑包和 Claude 捆绑包，包括无清单的 Claude 默认布局捆绑包。
+- **配置更改需要网关重启。**
+- `allow`：可选允许列表（仅列出的插件加载）。`deny` 优先。
+- `plugins.entries.<id>.apiKey`：插件级 API 密钥便利字段（当插件支持时）。
+- `plugins.entries.<id>.env`：插件范围的环境变量映射。
+- `plugins.entries.<id>.hooks.allowPromptInjection`：为 `false` 时，核心阻止 `before_prompt_build` 并忽略旧版 `before_agent_start` 中的提示变更字段，同时保留旧版 `modelOverride` 和 `providerOverride`。适用于原生插件钩子和支持的捆绑提供的钩子目录。
+- `plugins.entries.<id>.hooks.allowConversationAccess`：为 `true` 时，受信任的非捆绑插件可以从类型化钩子（如 `llm_input`、`llm_output`、`before_agent_finalize` 和 `agent_end`）中读取原始对话内容。
+- `plugins.entries.<id>.subagent.allowModelOverride`：明确信任此插件为后台子代理运行请求每次运行的 `provider` 和 `model` 覆盖。
+- `plugins.entries.<id>.subagent.allowedModels`：受信任子代理覆盖的规范 `provider/model` 目标的可选允许列表。仅当你有意想允许任何模型时使用 `"*"`。
+- `plugins.entries.<id>.config`：插件定义的配置对象（当有原生 OpenClaw 插件模式时由其验证）。
+- 渠道插件账户/运行时设置位于 `channels.<id>` 下，应由拥有插件的清单 `channelConfigs` 元数据描述，而不是由中央 OpenClaw 选项注册表描述。
+- `plugins.entries.firecrawl.config.webFetch`：Firecrawl 网络抓取提供商设置。
+  - `apiKey`：Firecrawl API 密钥（接受 SecretRef）。回退到 `plugins.entries.firecrawl.config.webSearch.apiKey`、旧版 `tools.web.fetch.firecrawl.apiKey` 或 `FIRECRAWL_API_KEY` 环境变量。
+  - `baseUrl`：Firecrawl API 基础 URL（默认：`https://api.firecrawl.dev`；自托管覆盖必须针对私有/内部端点）。
+  - `onlyMainContent`：仅从页面提取主要内容（默认：`true`）。
+  - `maxAgeMs`：最大缓存年龄（毫秒）（默认：`172800000` / 2 天）。
+  - `timeoutSeconds`：抓取请求超时（秒）（默认：`60`）。
+- `plugins.entries.xai.config.xSearch`：xAI X 搜索（Grok 网络搜索）设置。
+  - `enabled`：启用 X 搜索提供商。
+  - `model`：用于搜索的 Grok 模型（例如 `"grok-4-1-fast"`）。
+- `plugins.entries.memory-core.config.dreaming`：内存梦境设置。阶段和阈值见[梦境](/concepts/dreaming)。
+  - `enabled`：主梦境开关（默认 `false`）。
+  - `frequency`：每次完整梦境扫描的 cron 节奏（默认 `"0 3 * * *"`）。
+  - `model`：可选的梦境日记子代理模型覆盖。需要 `plugins.entries.memory-core.subagent.allowModelOverride: true`；与 `allowedModels` 配对以限制目标。模型不可用错误使用会话默认模型重试一次；信任或允许列表失败不会静默回退。
+  - 阶段策略和阈值是实现细节（非用户面配置键）。
+- 完整内存配置位于[内存配置参考](/reference/memory-config)：
+  - `agents.defaults.memorySearch.*`
+  - `memory.backend`
+  - `memory.citations`
+  - `memory.qmd.*`
+  - `plugins.entries.memory-core.config.dreaming`
+- 已启用的 Claude 捆绑插件还可以从 `settings.json` 贡献嵌入式 Pi 默认值；OpenClaw 将这些应用为清理过的代理设置，而不是原始 OpenClaw 配置补丁。
+- `plugins.slots.memory`：选择活跃内存插件 id，或 `"none"` 以禁用内存插件。
+- `plugins.slots.contextEngine`：选择活跃上下文引擎插件 id；默认为 `"legacy"`，除非你安装并选择了另一个引擎。
+
+参见[插件](/tools/plugin)。
+
+---
+
+## 承诺
+
+`commitments` 控制推断的后续内存：OpenClaw 可以检测对话轮次中的签到并通过心跳运行传递它们。
+
+- `commitments.enabled`：启用隐藏的 LLM 提取、存储和心跳传递，用于推断的后续承诺。默认：`false`。
+- `commitments.maxPerDay`：在滚动一天内每个代理会话传递的最大推断后续承诺数。默认：`3`。
+
+参见[推断承诺](/concepts/commitments)。
+
+---
+
+## 浏览器
+
+```json5
+{
+  browser: {
+    enabled: true,
+    evaluateEnabled: true,
+    defaultProfile: "user",
+    ssrfPolicy: {
+      // dangerouslyAllowPrivateNetwork: true, // 仅在受信任的私有网络访问时选择加入
+      // allowPrivateNetwork: true, // 旧版别名
+      // hostnameAllowlist: ["*.example.com", "example.com"],
+      // allowedHostnames: ["localhost"],
+    },
+    tabCleanup: {
+      enabled: true,
+      idleMinutes: 120,
+      maxTabsPerSession: 8,
+      sweepMinutes: 5,
+    },
+    profiles: {
+      openclaw: { cdpPort: 18800, color: "#FF4500" },
+      work: {
+        cdpPort: 18801,
+        color: "#0066CC",
+        executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+      },
+      user: { driver: "existing-session", attachOnly: true, color: "#00AA00" },
+      brave: {
+        driver: "existing-session",
+        attachOnly: true,
+        userDataDir: "~/Library/Application Support/BraveSoftware/Brave-Browser",
+        color: "#FB542B",
+      },
+      remote: { cdpUrl: "http://10.0.0.42:9222", color: "#00AA00" },
+    },
+    color: "#FF4500",
+    // headless: false,
+    // noSandbox: false,
+    // extraArgs: [],
+    // executablePath: "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+    // attachOnly: false,
+  },
+}
+```
+
+- `evaluateEnabled: false` 禁用 `act:evaluate` 和 `wait --fn`。
+- `tabCleanup` 在空闲时间或会话超过上限后回收跟踪的主代理标签页。将 `idleMinutes: 0` 或 `maxTabsPerSession: 0` 设置为禁用各个清理模式。
+- 未设置时 `ssrfPolicy.dangerouslyAllowPrivateNetwork` 是禁用的，因此默认情况下浏览器导航保持严格。
+- 仅当你有意信任私有网络浏览器导航时才将 `ssrfPolicy.dangerouslyAllowPrivateNetwork: true` 设置。
+- 在严格模式下，远程 CDP 配置文件端点（`profiles.*.cdpUrl`）在可达性/发现检查期间受到相同的私有网络阻塞。
+- `ssrfPolicy.allowPrivateNetwork` 作为旧版别名仍受支持。
+- 在严格模式下，使用 `ssrfPolicy.hostnameAllowlist` 和 `ssrfPolicy.allowedHostnames` 进行明确例外。
+- 远程配置文件仅供附加（启动/停止/重置已禁用）。
+- `profiles.*.cdpUrl` 接受 `http://`、`https://`、`ws://` 和 `wss://`。当你想让 OpenClaw 发现 `/json/version` 时使用 HTTP(S)；当你的提供商给你一个直接的 DevTools WebSocket URL 时使用 WS(S)。
+- `remoteCdpTimeoutMs` 和 `remoteCdpHandshakeTimeoutMs` 适用于远程和 `attachOnly` CDP 可达性以及标签页打开请求。托管环回配置文件保持本地 CDP 默认值。
+- 如果外部托管的 CDP 服务通过环回可达，将该配置文件的 `attachOnly: true` 设置；否则 OpenClaw 将环回端口视为本地托管浏览器配置文件，可能报告本地端口所有权错误。
+- `existing-session` 配置文件使用 Chrome MCP 而不是 CDP，可以在所选主机或通过连接的浏览器节点上附加。
+- `existing-session` 配置文件可以设置 `userDataDir` 以针对特定的基于 Chromium 的浏览器配置文件，如 Brave 或 Edge。
+- `existing-session` 配置文件保持当前 Chrome MCP 路由限制：快照/ref 驱动操作而不是 CSS 选择器目标、一次文件上传钩子、无对话超时覆盖、无 `wait --load networkidle`，以及无 `responsebody`、PDF 导出、下载拦截或批量操作。
+- 本地托管 `openclaw` 配置文件自动分配 `cdpPort` 和 `cdpUrl`；仅对远程 CDP 明确设置 `cdpUrl`。
+- 本地托管配置文件可以设置 `executablePath` 以覆盖该配置文件的全局 `browser.executablePath`。使用此功能在 Chrome 中运行一个配置文件，在 Brave 中运行另一个。
+- 本地托管配置文件使用 `browser.localLaunchTimeoutMs` 进行进程启动后的 Chrome CDP HTTP 发现，以及 `browser.localCdpReadyTimeoutMs` 进行启动后 CDP websocket 就绪。在较慢的主机上提高它们，Chrome 成功启动但就绪检查与启动竞争。两个值都必须是最多 `120000` ms 的正整数；无效配置值被拒绝。
+- 自动检测顺序：如果是基于 Chromium 的默认浏览器 → Chrome → Brave → Edge → Chromium → Chrome Canary。
+- `browser.executablePath` 和 `browser.profiles.<name>.executablePath` 在 Chromium 启动前都接受 `~` 和 `~/...` 用于你的操作系统主目录。`existing-session` 配置文件上的每个配置文件 `userDataDir` 也会进行波浪号展开。
+- 控制服务：仅环回（端口从 `gateway.port` 派生，默认 `18791`）。
+- `extraArgs` 在本地 Chromium 启动时附加额外的启动标志（例如 `--disable-gpu`、窗口大小或调试标志）。
+
+---
+
+## UI
+
+```json5
+{
+  ui: {
+    seamColor: "#FF4500",
+    assistant: {
+      name: "OpenClaw",
+      avatar: "CB", // emoji、短文本、图片 URL 或数据 URI
+    },
+  },
+}
+```
+
+- `seamColor`：原生应用 UI 外壳的强调色（Talk 模式气泡色调等）。
+- `assistant`：Control UI 身份覆盖。回退到活跃代理身份。
+
+---
+
+## 网关
+
+```json5
+{
+  gateway: {
+    mode: "local", // local | remote
+    port: 18789,
+    bind: "loopback",
+    auth: {
+      mode: "token", // none | token | password | trusted-proxy
+      token: "your-token",
+      // password: "your-password", // 或 OPENCLAW_GATEWAY_PASSWORD
+      // trustedProxy: { userHeader: "x-forwarded-user" }, // 用于 mode=trusted-proxy；参见 /gateway/trusted-proxy-auth
+      allowTailscale: true,
+      rateLimit: {
+        maxAttempts: 10,
+        windowMs: 60000,
+        lockoutMs: 300000,
+        exemptLoopback: true,
+      },
+    },
+    tailscale: {
+      mode: "off", // off | serve | funnel
+      resetOnExit: false,
+    },
+    controlUi: {
+      enabled: true,
+      basePath: "/openclaw",
+      // root: "dist/control-ui",
+      // embedSandbox: "scripts", // strict | scripts | trusted
+      // allowExternalEmbedUrls: false, // 危险：允许绝对外部 http(s) embed URLs
+      // chatMessageMaxWidth: "min(1280px, 82%)", // 可选的分组聊天消息最大宽度
+      // allowedOrigins: ["https://control.example.com"], // 非环回 Control UI 所需
+      // dangerouslyAllowHostHeaderOriginFallback: false, // 危险的 Host 头部来源回退模式
+      // allowInsecureAuth: false,
+      // dangerouslyDisableDeviceAuth: false,
+    },
+    remote: {
+      url: "ws://gateway.tailnet:18789",
+      transport: "ssh", // ssh | direct
+      token: "your-token",
+      // password: "your-password",
+    },
+    trustedProxies: ["10.0.0.1"],
+    // 可选。默认 false。
+    allowRealIpFallback: false,
+    nodes: {
+      pairing: {
+        // 可选。默认未设置/禁用。
+        autoApproveCidrs: ["192.168.1.0/24", "fd00:1234:5678::/64"],
+      },
+      allowCommands: ["canvas.navigate"],
+      denyCommands: ["system.run"],
+    },
+    tools: {
+      // 额外的 /tools/invoke HTTP 拒绝
+      deny: ["browser"],
+      // 从默认 HTTP 拒绝列表中删除工具
+      allow: ["gateway"],
+    },
+    push: {
+      apns: {
+        relay: {
+          baseUrl: "https://relay.example.com",
+          timeoutMs: 10000,
+        },
+      },
+    },
+  },
+}
+```
+
+<Accordion title="网关字段详情">
+
+- `mode`：`local`（运行网关）或 `remote`（连接到远程网关）。网关拒绝启动，除非是 `local`。
+- `port`：WS + HTTP 的单一多路复用端口。优先级：`--port` > `OPENCLAW_GATEWAY_PORT` > `gateway.port` > `18789`。
+- `bind`：`auto`、`loopback`（默认）、`lan`（`0.0.0.0`）、`tailnet`（仅 Tailscale IP）或 `custom`。
+- **旧版 bind 别名**：在 `gateway.bind` 中使用 bind 模式值（`auto`、`loopback`、`lan`、`tailnet`、`custom`），而不是主机别名（`0.0.0.0`、`127.0.0.1`、`localhost`、`::`、`::1`）。
+- **Docker 注意事项**：默认 `loopback` bind 在容器内的 `127.0.0.1` 上监听。使用 Docker 桥接网络（`-p 18789:18789`），流量到达 `eth0`，因此网关不可达。使用 `--network host`，或将 `bind: "lan"`（或带 `customBindHost: "0.0.0.0"` 的 `bind: "custom"`）设置为在所有接口上监听。
+- **认证**：默认必需。非环回绑定需要网关认证。实际上这意味着共享令牌/密码或带有 `gateway.auth.mode: "trusted-proxy"` 的身份感知反向代理。入门向导默认生成令牌。
+- 如果同时配置了 `gateway.auth.token` 和 `gateway.auth.password`（包括 SecretRefs），请将 `gateway.auth.mode` 明确设置为 `token` 或 `password`。当两者都配置且模式未设置时，启动和服务安装/修复流程失败。
+- `gateway.auth.mode: "none"`：明确的无认证模式。仅用于受信任的本地环回设置；这故意不由入门提示提供。
+- `gateway.auth.mode: "trusted-proxy"`：将浏览器/用户认证委托给身份感知反向代理，并信任来自 `gateway.trustedProxies` 的身份标头（参见[受信任代理认证](/gateway/trusted-proxy-auth)）。此模式默认期望**非环回**代理源；同一主机环回反向代理需要明确的 `gateway.auth.trustedProxy.allowLoopback = true`。内部同一主机调用者可以使用 `gateway.auth.password` 作为本地直接回退；`gateway.auth.token` 仍与受信任代理模式互斥。
+- `gateway.auth.allowTailscale`：为 `true` 时，Tailscale Serve 身份标头可以满足 Control UI/WebSocket 认证（通过 `tailscale whois` 验证）。HTTP API 端点**不**使用该 Tailscale 标头认证；它们遵循网关的正常 HTTP 认证模式。此无令牌流假设网关主机是受信任的。当 `tailscale.mode = "serve"` 时默认为 `true`。
+- `gateway.auth.rateLimit`：可选的失败认证限制器。每客户端 IP 和每认证范围（共享密钥和设备令牌分别跟踪）应用。被阻止的尝试返回 `429` + `Retry-After`。
+  - 在异步 Tailscale Serve Control UI 路径上，同一 `{scope, clientIp}` 的失败尝试在失败写入前串行化。来自同一客户端的并发错误尝试因此可能在第二个请求上触发限制器，而不是两者都作为普通不匹配通过。
+  - `gateway.auth.rateLimit.exemptLoopback` 默认为 `true`；当你有意想要也对 localhost 流量进行速率限制时设置为 `false`（用于测试设置或严格代理部署）。
+- 浏览器来源 WS 认证尝试总是以禁用环回豁免进行限制（针对基于浏览器的 localhost 暴力破解的深度防御）。
+- 在环回上，这些浏览器来源锁定是按规范化的 `Origin` 值隔离的，因此来自一个 localhost 来源的重复失败不会自动锁定不同的来源。
+- `tailscale.mode`：`serve`（仅 tailnet，环回绑定）或 `funnel`（公开，需要认证）。
+- `controlUi.allowedOrigins`：网关 WebSocket 连接的明确浏览器来源允许列表。当预期浏览器客户端来自非环回来源时必需。
+- `controlUi.chatMessageMaxWidth`：分组 Control UI 聊天消息的可选最大宽度。接受受约束的 CSS 宽度值，如 `960px`、`82%`、`min(1280px, 82%)` 和 `calc(100% - 2rem)`。
+- `controlUi.dangerouslyAllowHostHeaderOriginFallback`：危险模式，为有意依赖 Host 标头来源策略的部署启用 Host 标头来源回退。
+- `remote.transport`：`ssh`（默认）或 `direct`（ws/wss）。对于 `direct`，`remote.url` 必须是 `ws://` 或 `wss://`。
+- `OPENCLAW_ALLOW_INSECURE_PRIVATE_WS=1`：客户端进程环境突破口覆盖，允许对受信任的私有网络 IP 使用明文 `ws://`；明文默认仍仅限环回。没有 `openclaw.json` 等效项，浏览器私有网络配置如 `browser.ssrfPolicy.dangerouslyAllowPrivateNetwork` 不影响网关 WebSocket 客户端。
+- `gateway.remote.token` / `.password` 是远程客户端凭据字段。它们本身不配置网关认证。
+- `gateway.push.apns.relay.baseUrl`：官方/TestFlight iOS 构建在将中继支持的注册发布到网关后使用的外部 APNs 中继的基础 HTTPS URL。此 URL 必须与 iOS 构建中编译的中继 URL 匹配。
+- `gateway.push.apns.relay.timeoutMs`：网关到中继发送超时（毫秒）。默认为 `10000`。
+- 中继支持的注册委托给特定的网关身份。已配对的 iOS 应用获取 `gateway.identity.get`，将该身份包含在中继注册中，并将注册范围的发送授权转发给网关。另一个网关不能重用该存储的注册。
+- `OPENCLAW_APNS_RELAY_BASE_URL` / `OPENCLAW_APNS_RELAY_TIMEOUT_MS`：上述中继配置的临时环境覆盖。
+- `OPENCLAW_APNS_RELAY_ALLOW_HTTP=true`：仅供开发的环回 HTTP 中继 URL 逃生通道。生产中继 URL 应保持 HTTPS。
+- `gateway.handshakeTimeoutMs`：预认证网关 WebSocket 握手超时（毫秒）。默认：`15000`。设置时 `OPENCLAW_HANDSHAKE_TIMEOUT_MS` 优先。在本地客户端可以连接但启动预热仍在稳定的加载或低功率主机上增加此值。
+- `gateway.channelHealthCheckMinutes`：渠道健康监测器间隔（分钟）。设置 `0` 以全局禁用健康监测器重启。默认：`5`。
+- `gateway.channelStaleEventThresholdMinutes`：过时套接字阈值（分钟）。保持大于或等于 `gateway.channelHealthCheckMinutes`。默认：`30`。
+- `gateway.channelMaxRestartsPerHour`：每个渠道/账户在滚动小时内的最大健康监测器重启次数。默认：`10`。
+- `channels.<provider>.healthMonitor.enabled`：健康监测器重启的每渠道选择退出，同时保持全局监测器启用。
+- `channels.<provider>.accounts.<accountId>.healthMonitor.enabled`：多账户渠道的每账户覆盖。设置时，它优先于渠道级覆盖。
+- 本地网关调用路径只有在 `gateway.auth.*` 未设置时才能使用 `gateway.remote.*` 作为回退。
+- 如果 `gateway.auth.token` / `gateway.auth.password` 通过 SecretRef 明确配置且未解析，解析会失败关闭（没有远程回退屏蔽）。
+- `trustedProxies`：终止 TLS 或注入转发客户端标头的反向代理 IP。仅列出你控制的代理。环回条目对于同一主机代理/本地检测设置（例如 Tailscale Serve 或本地反向代理）仍然有效，但它们**不**使环回请求有资格使用 `gateway.auth.mode: "trusted-proxy"`。
+- `allowRealIpFallback`：为 `true` 时，如果缺少 `X-Forwarded-For`，网关接受 `X-Real-IP`。默认 `false` 用于失败关闭行为。
+- `gateway.nodes.pairing.autoApproveCidrs`：可选的 CIDR/IP 允许列表，用于自动批准无请求范围的首次节点设备配对。未设置时禁用。这不会自动批准操作员/浏览器/Control UI/WebChat 配对，也不会自动批准角色、范围、元数据或公钥升级。
+- `gateway.nodes.allowCommands` / `gateway.nodes.denyCommands`：在配对和平台允许列表评估后用于声明节点命令的全局允许/拒绝整形。使用 `allowCommands` 选择加入危险节点命令，如 `camera.snap`、`camera.clip` 和 `screen.record`；`denyCommands` 删除命令，即使平台默认值或明确的允许会包含它。节点更改其声明的命令列表后，拒绝并重新批准该设备配对，以便网关存储更新的命令快照。
+- `gateway.tools.deny`：为 HTTP `POST /tools/invoke` 阻止的额外工具名称（扩展默认拒绝列表）。
+- `gateway.tools.allow`：从默认 HTTP 拒绝列表中删除工具名称。
+
+</Accordion>
+
+### OpenAI 兼容端点
+
+- Chat Completions：默认禁用。使用 `gateway.http.endpoints.chatCompletions.enabled: true` 启用。
+- Responses API：`gateway.http.endpoints.responses.enabled`。
+- Responses URL 输入加固：
+  - `gateway.http.endpoints.responses.maxUrlParts`
+  - `gateway.http.endpoints.responses.files.urlAllowlist`
+  - `gateway.http.endpoints.responses.images.urlAllowlist`
+    空允许列表被视为未设置；使用 `gateway.http.endpoints.responses.files.allowUrl=false` 和/或 `gateway.http.endpoints.responses.images.allowUrl=false` 禁用 URL 获取。
+- 可选响应加固标头：
+  - `gateway.http.securityHeaders.strictTransportSecurity`（仅为你控制的 HTTPS 来源设置；参见[受信任代理认证](/gateway/trusted-proxy-auth#tls-termination-and-hsts)）
+
+### 多实例隔离
+
+在一台主机上运行多个具有唯一端口和状态目录的网关：
+
+```bash
+OPENCLAW_CONFIG_PATH=~/.openclaw/a.json \
+OPENCLAW_STATE_DIR=~/.openclaw-a \
+openclaw gateway --port 19001
+```
+
+便利标志：`--dev`（使用 `~/.openclaw-dev` + 端口 `19001`），`--profile <name>`（使用 `~/.openclaw-<name>`）。
+
+参见[多网关](/gateway/multiple-gateways)。
+
+### `gateway.tls`
+
+```json5
+{
+  gateway: {
+    tls: {
+      enabled: false,
+      autoGenerate: false,
+      certPath: "/etc/openclaw/tls/server.crt",
+      keyPath: "/etc/openclaw/tls/server.key",
+      caPath: "/etc/openclaw/tls/ca-bundle.crt",
+    },
+  },
+}
+```
+
+- `enabled`：在网关监听器上启用 TLS 终止（HTTPS/WSS）（默认：`false`）。
+- `autoGenerate`：当未配置明确的文件时自动生成本地自签名证书/密钥对；仅用于本地/开发。
+- `certPath`：TLS 证书文件的文件系统路径。
+- `keyPath`：TLS 私钥文件的文件系统路径；保持权限限制。
+- `caPath`：用于客户端验证或自定义信任链的可选 CA 捆绑包路径。
+
+### `gateway.reload`
+
+```json5
+{
+  gateway: {
+    reload: {
+      mode: "hybrid", // off | restart | hot | hybrid
+      debounceMs: 500,
+      deferralTimeoutMs: 300000,
+    },
+  },
+}
+```
+
+- `mode`：控制配置编辑在运行时如何应用。
+  - `"off"`：忽略实时编辑；更改需要明确重启。
+  - `"restart"`：总是在配置更改时重启网关进程。
+  - `"hot"`：在进程内应用更改而不重启。
+  - `"hybrid"`（默认）：首先尝试热重载；如果需要则回退到重启。
+- `debounceMs`：配置更改应用前的防抖窗口（毫秒）（非负整数）。
+- `deferralTimeoutMs`：在强制重启前等待进行中操作的可选最大时间（毫秒）。省略以使用默认有界等待（`300000`）；设置 `0` 无限等待并记录定期仍挂起的警告。
+
+---
+
+## Hooks
+
+```json5
+{
+  hooks: {
+    enabled: true,
+    token: "shared-secret",
+    path: "/hooks",
+    maxBodyBytes: 262144,
+    defaultSessionKey: "hook:ingress",
+    allowRequestSessionKey: true,
+    allowedSessionKeyPrefixes: ["hook:", "hook:gmail:"],
+    allowedAgentIds: ["hooks", "main"],
+    presets: ["gmail"],
+    transformsDir: "~/.openclaw/hooks/transforms",
+    mappings: [
+      {
+        match: { path: "gmail" },
+        action: "agent",
+        agentId: "hooks",
+        wakeMode: "now",
+        name: "Gmail",
+        sessionKey: "hook:gmail:{{messages[0].id}}",
+        messageTemplate: "From: {{messages[0].from}}\nSubject: {{messages[0].subject}}\n{{messages[0].snippet}}",
+        deliver: true,
+        channel: "last",
+        model: "openai/gpt-5.4-mini",
+      },
+    ],
+  },
+}
+```
+
+认证：`Authorization: Bearer <token>` 或 `x-openclaw-token: <token>`。
+查询字符串 hook 令牌被拒绝。
+
+验证和安全注意事项：
+
+- `hooks.enabled=true` 需要非空的 `hooks.token`。
+- `hooks.token` 必须与 `gateway.auth.token` **不同**；重用网关令牌被拒绝。
+- `hooks.path` 不能是 `/`；使用专用子路径如 `/hooks`。
+- 如果 `hooks.allowRequestSessionKey=true`，约束 `hooks.allowedSessionKeyPrefixes`（例如 `["hook:"]`）。
+- 如果映射或预设使用模板化的 `sessionKey`，设置 `hooks.allowedSessionKeyPrefixes` 和 `hooks.allowRequestSessionKey=true`。静态映射键不需要该选择加入。
+
+**端点：**
+
+- `POST /hooks/wake` → `{ text, mode?: "now"|"next-heartbeat" }`
+- `POST /hooks/agent` → `{ message, name?, agentId?, sessionKey?, wakeMode?, deliver?, channel?, to?, model?, thinking?, timeoutSeconds? }`
+  - 来自请求有效载荷的 `sessionKey` 仅在 `hooks.allowRequestSessionKey=true`（默认：`false`）时被接受。
+- `POST /hooks/<name>` → 通过 `hooks.mappings` 解析
+  - 模板渲染的映射 `sessionKey` 值被视为外部提供，也需要 `hooks.allowRequestSessionKey=true`。
+
+<Accordion title="映射详情">
+
+- `match.path` 匹配 `/hooks` 后的子路径（例如 `/hooks/gmail` → `gmail`）。
+- `match.source` 匹配通用路径的有效载荷字段。
+- 像 `{{messages[0].subject}}` 这样的模板从有效载荷中读取。
+- `transform` 可以指向返回钩子操作的 JS/TS 模块。
+  - `transform.module` 必须是相对路径，并保持在 `hooks.transformsDir` 内（绝对路径和遍历被拒绝）。
+  - 将 `hooks.transformsDir` 保持在 `~/.openclaw/hooks/transforms` 下；工作区技能目录被拒绝。如果 `openclaw doctor` 报告此路径无效，将转换模块移到 hooks 转换目录或删除 `hooks.transformsDir`。
+- `agentId` 路由到特定代理；未知 ID 回退到默认。
+- `allowedAgentIds`：限制明确路由（`*` 或省略 = 允许全部，`[]` = 拒绝全部）。
+- `defaultSessionKey`：无明确 `sessionKey` 的 hook 代理运行的可选固定会话键。
+- `allowRequestSessionKey`：允许 `/hooks/agent` 调用者和模板驱动的映射会话键设置 `sessionKey`（默认：`false`）。
+- `allowedSessionKeyPrefixes`：明确 `sessionKey` 值（请求 + 映射）的可选前缀允许列表，例如 `["hook:"]`。当任何映射或预设使用模板化的 `sessionKey` 时它变为必需。
+- `deliver: true` 将最终回复发送到渠道；`channel` 默认为 `last`。
+- `model` 覆盖此 hook 运行的 LLM（如果设置了模型目录，必须被允许）。
+
+</Accordion>
+
+### Gmail 集成
+
+- 内置 Gmail 预设使用 `sessionKey: "hook:gmail:{{messages[0].id}}"`。
+- 如果你保留该每消息路由，将 `hooks.allowRequestSessionKey: true` 设置并约束 `hooks.allowedSessionKeyPrefixes` 以匹配 Gmail 命名空间，例如 `["hook:", "hook:gmail:"]`。
+- 如果你需要 `hooks.allowRequestSessionKey: false`，用静态 `sessionKey` 覆盖预设，而不是模板化的默认值。
+
+```json5
+{
+  hooks: {
+    gmail: {
+      account: "openclaw@gmail.com",
+      topic: "projects/<project-id>/topics/gog-gmail-watch",
+      subscription: "gog-gmail-watch-push",
+      pushToken: "shared-push-token",
+      hookUrl: "http://127.0.0.1:18789/hooks/gmail",
+      includeBody: true,
+      maxBytes: 20000,
+      renewEveryMinutes: 720,
+      serve: { bind: "127.0.0.1", port: 8788, path: "/" },
+      tailscale: { mode: "funnel", path: "/gmail-pubsub" },
+      model: "openrouter/meta-llama/llama-3.3-70b-instruct:free",
+      thinking: "off",
+    },
+  },
+}
+```
+
+- 配置后网关在启动时自动启动 `gog gmail watch serve`。设置 `OPENCLAW_SKIP_GMAIL_WATCHER=1` 禁用。
+- 不要在网关旁边单独运行 `gog gmail watch serve`。
+
+---
+
+## Canvas 主机
+
+```json5
+{
+  canvasHost: {
+    root: "~/.openclaw/workspace/canvas",
+    liveReload: true,
+    // enabled: false, // 或 OPENCLAW_SKIP_CANVAS_HOST=1
+  },
+}
+```
+
+- 通过网关端口提供代理可编辑的 HTML/CSS/JS 和 A2UI：
+  - `http://<gateway-host>:<gateway.port>/__openclaw__/canvas/`
+  - `http://<gateway-host>:<gateway.port>/__openclaw__/a2ui/`
+- 仅本地：保持 `gateway.bind: "loopback"`（默认）。
+- 非环回绑定：canvas 路由需要网关认证（令牌/密码/受信任代理），与其他网关 HTTP 面相同。
+- 节点 WebView 通常不发送认证标头；节点配对并连接后，网关为 canvas/A2UI 访问广告节点范围的功能 URL。
+- 功能 URL 绑定到活跃节点 WS 会话并快速过期。不使用基于 IP 的回退。
+- 将实时重载客户端注入到提供的 HTML 中。
+- 为空时自动创建启动器 `index.html`。
+- 还在 `/__openclaw__/a2ui/` 提供 A2UI。
+- 更改需要网关重启。
+- 对于大型目录或 `EMFILE` 错误，禁用实时重载。
+
+---
+
+## 发现
+
+### mDNS（Bonjour）
+
+```json5
+{
+  discovery: {
+    mdns: {
+      mode: "minimal", // minimal | full | off
+    },
+  },
+}
+```
+
+- `minimal`（当捆绑的 `bonjour` 插件启用时的默认值）：从 TXT 记录中省略 `cliPath` + `sshPort`。
+- `full`：包含 `cliPath` + `sshPort`；LAN 多播广告仍需要启用捆绑的 `bonjour` 插件。
+- `off`：在不更改插件启用状态的情况下抑制 LAN 多播广告。
+- 捆绑的 `bonjour` 插件在 macOS 主机上自动启动，在 Linux、Windows 和容器化网关部署上需要选择加入。
+- 当主机名是有效的 DNS 标签时，主机名默认为系统主机名，否则回退到 `openclaw`。使用 `OPENCLAW_MDNS_HOSTNAME` 覆盖。
+
+### 广域（DNS-SD）
+
+```json5
+{
+  discovery: {
+    wideArea: { enabled: true },
+  },
+}
+```
+
+在 `~/.openclaw/dns/` 下写入单播 DNS-SD 区域。对于跨网络发现，与 DNS 服务器（推荐 CoreDNS）+ Tailscale 分割 DNS 配对。
+
+设置：`openclaw dns setup --apply`。
+
+---
+
+## 环境
+
+### `env`（内联环境变量）
+
+```json5
+{
+  env: {
+    OPENROUTER_API_KEY: "sk-or-...",
+    vars: {
+      GROQ_API_KEY: "gsk-...",
+    },
+    shellEnv: {
+      enabled: true,
+      timeoutMs: 15000,
+    },
+  },
+}
+```
+
+- 内联环境变量仅在进程环境缺少该键时应用。
+- `.env` 文件：CWD `.env` + `~/.openclaw/.env`（两者都不覆盖现有变量）。
+- `shellEnv`：从你的登录 shell 配置文件导入缺少的预期键。
+- 完整优先级参见[环境](/help/environment)。
+
+### 环境变量替换
+
+使用 `${VAR_NAME}` 在任何配置字符串中引用环境变量：
+
+```json5
+{
+  gateway: {
+    auth: { token: "${OPENCLAW_GATEWAY_TOKEN}" },
+  },
+}
+```
+
+- 仅匹配大写名称：`[A-Z_][A-Z0-9_]*`。
+- 缺少/空变量在配置加载时抛出错误。
+- 使用 `$${VAR}` 转义以获取字面量 `${VAR}`。
+- 适用于 `$include`。
+
+---
+
+## 秘密
+
+秘密引用是附加的：纯文本值仍然有效。
+
+### `SecretRef`
+
+使用一种对象形式：
+
+```json5
+{ source: "env" | "file" | "exec", provider: "default", id: "..." }
+```
+
+验证：
+
+- `provider` 模式：`^[a-z][a-z0-9_-]{0,63}$`
+- `source: "env"` id 模式：`^[A-Z][A-Z0-9_]{0,127}$`
+- `source: "file"` id：绝对 JSON 指针（例如 `"/providers/openai/apiKey"`）
+- `source: "exec"` id 模式：`^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$`
+- `source: "exec"` id 不得包含 `.` 或 `..` 斜线分隔的路径段（例如 `a/../b` 被拒绝）
+
+### 支持的凭据面
+
+- 规范矩阵：[SecretRef 凭据面](/reference/secretref-credential-surface)
+- `secrets apply` 针对支持的 `openclaw.json` 凭据路径。
+- `auth-profiles.json` 引用包含在运行时解析和审计覆盖中。
+
+### 秘密提供商配置
+
+```json5
+{
+  secrets: {
+    providers: {
+      default: { source: "env" }, // 可选的明确 env 提供商
+      filemain: {
+        source: "file",
+        path: "~/.openclaw/secrets.json",
+        mode: "json",
+        timeoutMs: 5000,
+      },
+      vault: {
+        source: "exec",
+        command: "/usr/local/bin/openclaw-vault-resolver",
+        passEnv: ["PATH", "VAULT_ADDR"],
+      },
+    },
+    defaults: {
+      env: "default",
+      file: "filemain",
+      exec: "vault",
+    },
+  },
+}
+```
+
+注意：
+
+- `file` 提供商支持 `mode: "json"` 和 `mode: "singleValue"`（在 singleValue 模式下 `id` 必须是 `"value"`）。
+- 当 Windows ACL 验证不可用时，文件和 exec 提供商路径失败关闭。仅对无法验证的受信任路径设置 `allowInsecurePath: true`。
+- `exec` 提供商需要绝对的 `command` 路径，并在 stdin/stdout 上使用协议有效载荷。
+- 默认情况下，符号链接命令路径被拒绝。设置 `allowSymlinkCommand: true` 以允许符号链接路径同时验证解析的目标路径。
+- 如果配置了 `trustedDirs`，受信任目录检查适用于解析的目标路径。
+- `exec` 子环境默认是最小的；使用 `passEnv` 明确传递所需变量。
+- 秘密引用在激活时解析为内存中的快照，然后请求路径只读取快照。
+- 激活时应用活跃面过滤：启用面上未解析的引用导致启动/重载失败，而非活跃面跳过并提供诊断。
+
+---
+
+## 认证存储
+
+```json5
+{
+  auth: {
+    profiles: {
+      "anthropic:default": { provider: "anthropic", mode: "api_key" },
+      "anthropic:work": { provider: "anthropic", mode: "api_key" },
+      "openai-codex:personal": { provider: "openai-codex", mode: "oauth" },
+    },
+    order: {
+      anthropic: ["anthropic:default", "anthropic:work"],
+      "openai-codex": ["openai-codex:personal"],
+    },
+  },
+}
+```
+
+- 每代理配置文件存储在 `<agentDir>/auth-profiles.json`。
+- `auth-profiles.json` 支持静态凭据模式的值级引用（`api_key` 的 `keyRef`，`token` 的 `tokenRef`）。
+- 旧版平面 `auth-profiles.json` 映射如 `{ "provider": { "apiKey": "..." } }` 不是运行时格式；`openclaw doctor --fix` 将它们重写为规范的 `provider:default` API 密钥配置文件，备份为 `.legacy-flat.*.bak`。
+- OAuth 模式配置文件（`auth.profiles.<id>.mode = "oauth"`）不支持 SecretRef 支持的认证配置文件凭据。
+- 静态运行时凭据来自内存中解析的快照；发现时擦除旧版静态 `auth.json` 条目。
+- 旧版 OAuth 从 `~/.openclaw/credentials/oauth.json` 导入。
+- 参见 [OAuth](/concepts/oauth)。
+- 秘密运行时行为和 `audit/configure/apply` 工具：[秘密管理](/gateway/secrets)。
+
+### `auth.cooldowns`
+
+```json5
+{
+  auth: {
+    cooldowns: {
+      billingBackoffHours: 5,
+      billingBackoffHoursByProvider: { anthropic: 3, openai: 8 },
+      billingMaxHours: 24,
+      authPermanentBackoffMinutes: 10,
+      authPermanentMaxMinutes: 60,
+      failureWindowHours: 24,
+      overloadedProfileRotations: 1,
+      overloadedBackoffMs: 0,
+      rateLimitedProfileRotations: 1,
+    },
+  },
+}
+```
+
+- `billingBackoffHours`：配置文件因真实计费/余额不足错误而失败时的基础回退（小时）（默认：`5`）。明确的计费文本即使在 `401`/`403` 响应上仍然可以到达这里，但提供商特定的文本匹配器仍限定在拥有它们的提供商范围内（例如 OpenRouter `Key limit exceeded`）。可重试的 HTTP `402` 使用窗口或组织/工作区支出限制消息留在 `rate_limit` 路径中。
+- `billingBackoffHoursByProvider`：计费回退小时的可选每提供商覆盖。
+- `billingMaxHours`：计费回退指数增长的上限（小时）（默认：`24`）。
+- `authPermanentBackoffMinutes`：高置信度 `auth_permanent` 失败的基础回退（分钟）（默认：`10`）。
+- `authPermanentMaxMinutes`：`auth_permanent` 回退增长的上限（分钟）（默认：`60`）。
+- `failureWindowHours`：用于回退计数器的滚动窗口（小时）（默认：`24`）。
+- `overloadedProfileRotations`：在切换到模型回退前，过载错误的最大同一提供商认证配置文件轮换次数（默认：`1`）。提供商繁忙形式如 `ModelNotReadyException` 归入此处。
+- `overloadedBackoffMs`：重试过载提供商/配置文件轮换前的固定延迟（默认：`0`）。
+- `rateLimitedProfileRotations`：在切换到模型回退前，速率限制错误的最大同一提供商认证配置文件轮换次数（默认：`1`）。该速率限制桶包含提供商形式的文本，如 `Too many concurrent requests`、`ThrottlingException`、`concurrency limit reached`、`workers_ai ... quota limit exceeded` 和 `resource exhausted`。
+
+---
+
+## 日志
+
+```json5
+{
+  logging: {
+    level: "info",
+    file: "/tmp/openclaw/openclaw.log",
+    consoleLevel: "info",
+    consoleStyle: "pretty", // pretty | compact | json
+    redactSensitive: "tools", // off | tools
+    redactPatterns: ["\\bTOKEN\\b\\s*[=:]\\s*([\"']?)([^\\s\"']+)\\1"],
+  },
+}
+```
+
+- 默认日志文件：`/tmp/openclaw/openclaw-YYYY-MM-DD.log`。
+- 设置 `logging.file` 以获取稳定路径。
+- `--verbose` 时 `consoleLevel` 提升到 `debug`。
+- `maxFileBytes`：轮换前活跃日志文件的最大大小（字节）（正整数；默认：`104857600` = 100 MB）。OpenClaw 在活跃文件旁边保留最多五个编号存档。
+- `redactSensitive` / `redactPatterns`：对控制台输出、文件日志、OTLP 日志记录和持久化会话转录文本的尽力屏蔽。`redactSensitive: "off"` 仅禁用此通用日志/转录策略；UI/工具/诊断安全面在发出前仍然屏蔽秘密。
+
+---
+
+## 诊断
+
+```json5
+{
+  diagnostics: {
+    enabled: true,
+    flags: ["telegram.*"],
+    stuckSessionWarnMs: 30000,
+
+    otel: {
+      enabled: false,
+      endpoint: "https://otel-collector.example.com:4318",
+      tracesEndpoint: "https://traces.example.com/v1/traces",
+      metricsEndpoint: "https://metrics.example.com/v1/metrics",
+      logsEndpoint: "https://logs.example.com/v1/logs",
+      protocol: "http/protobuf", // http/protobuf | grpc
+      headers: { "x-tenant-id": "my-org" },
+      serviceName: "openclaw-gateway",
+      traces: true,
+      metrics: true,
+      logs: false,
+      sampleRate: 1.0,
+      flushIntervalMs: 5000,
+      captureContent: {
+        enabled: false,
+        inputMessages: false,
+        outputMessages: false,
+        toolInputs: false,
+        toolOutputs: false,
+        systemPrompt: false,
+      },
+    },
+
+    cacheTrace: {
+      enabled: false,
+      filePath: "~/.openclaw/logs/cache-trace.jsonl",
+      includeMessages: true,
+      includePrompt: true,
+      includeSystem: true,
+    },
+  },
+}
+```
+
+- `enabled`：仪器输出的主开关（默认：`true`）。
+- `flags`：启用定向日志输出的标志字符串数组（支持通配符如 `"telegram.*"` 或 `"*"`）。
+- `stuckSessionWarnMs`：将长时间运行的处理会话分类为 `session.long_running`、`session.stalled` 或 `session.stuck` 的无进展年龄阈值（毫秒）。回复、工具、状态、块和 ACP 进度重置计时器；重复的 `session.stuck` 诊断在未更改时退避。
+- `otel.enabled`：启用 OpenTelemetry 导出管道（默认：`false`）。有关完整配置、信号目录和隐私模型，参见 [OpenTelemetry 导出](/gateway/opentelemetry)。
+- `otel.endpoint`：OTel 导出的收集器 URL。
+- `otel.tracesEndpoint` / `otel.metricsEndpoint` / `otel.logsEndpoint`：可选的信号特定 OTLP 端点。设置时，它们仅覆盖该信号的 `otel.endpoint`。
+- `otel.protocol`：`"http/protobuf"`（默认）或 `"grpc"`。
+- `otel.headers`：随 OTel 导出请求发送的额外 HTTP/gRPC 元数据标头。
+- `otel.serviceName`：资源属性的服务名称。
+- `otel.traces` / `otel.metrics` / `otel.logs`：启用跟踪、指标或日志导出。
+- `otel.sampleRate`：跟踪采样率 `0`–`1`。
+- `otel.flushIntervalMs`：定期遥测刷新间隔（毫秒）。
+- `otel.captureContent`：OTEL span 属性的可选原始内容捕获。默认关闭。布尔值 `true` 捕获非系统消息/工具内容；对象形式让你明确启用 `inputMessages`、`outputMessages`、`toolInputs`、`toolOutputs` 和 `systemPrompt`。
+- `OTEL_SEMCONV_STABILITY_OPT_IN=gen_ai_latest_experimental`：最新实验性 GenAI span 提供商属性的环境切换。默认情况下，span 保留旧版 `gen_ai.system` 属性以兼容；GenAI 指标使用有界语义属性。
+- `OPENCLAW_OTEL_PRELOADED=1`：已注册全局 OpenTelemetry SDK 的主机的环境切换。OpenClaw 然后跳过插件拥有的 SDK 启动/关闭，同时保持诊断监听器活跃。
+- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`、`OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` 和 `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`：当匹配的配置键未设置时使用的信号特定端点环境变量。
+- `cacheTrace.enabled`：记录嵌入运行的缓存跟踪快照（默认：`false`）。
+- `cacheTrace.filePath`：缓存跟踪 JSONL 的输出路径（默认：`$OPENCLAW_STATE_DIR/logs/cache-trace.jsonl`）。
+- `cacheTrace.includeMessages` / `includePrompt` / `includeSystem`：控制缓存跟踪输出中包含什么（全部默认：`true`）。
+
+---
+
+## 更新
+
+```json5
+{
+  update: {
+    channel: "stable", // stable | beta | dev
+    checkOnStart: true,
+
+    auto: {
+      enabled: false,
+      stableDelayHours: 6,
+      stableJitterHours: 12,
+      betaCheckIntervalHours: 1,
+    },
+  },
+}
+```
+
+- `channel`：npm/git 安装的发布渠道 — `"stable"`、`"beta"` 或 `"dev"`。
+- `checkOnStart`：网关启动时检查 npm 更新（默认：`true`）。
+- `auto.enabled`：为包安装启用后台自动更新（默认：`false`）。
+- `auto.stableDelayHours`：稳定渠道自动应用前的最小延迟（小时）（默认：`6`；最大：`168`）。
+- `auto.stableJitterHours`：额外的稳定渠道推出传播窗口（小时）（默认：`12`；最大：`168`）。
+- `auto.betaCheckIntervalHours`：Beta 渠道检查运行频率（小时）（默认：`1`；最大：`24`）。
+
+---
+
+## ACP
+
+```json5
+{
+  acp: {
+    enabled: true,
+    dispatch: { enabled: true },
+    backend: "acpx",
+    defaultAgent: "main",
+    allowedAgents: ["main", "ops"],
+    maxConcurrentSessions: 10,
+
+    stream: {
+      coalesceIdleMs: 50,
+      maxChunkChars: 1000,
+      repeatSuppression: true,
+      deliveryMode: "live", // live | final_only
+      hiddenBoundarySeparator: "paragraph", // none | space | newline | paragraph
+      maxOutputChars: 50000,
+      maxSessionUpdateChars: 500,
+    },
+
+    runtime: {
+      ttlMinutes: 30,
+    },
+  },
+}
+```
+
+- `enabled`：全局 ACP 功能门（默认：`true`；设置 `false` 以隐藏 ACP 调度和生成能力）。
+- `dispatch.enabled`：ACP 会话轮次调度的独立门（默认：`true`）。设置 `false` 以在阻止执行的同时保持 ACP 命令可用。
+- `backend`：默认 ACP 运行时后端 id（必须匹配已注册的 ACP 运行时插件）。先安装后端插件，如果设置了 `plugins.allow`，包含后端插件 id（例如 `acpx`），否则 ACP 后端不会加载。
+- `defaultAgent`：生成未指定明确目标时的回退 ACP 目标代理 id。
+- `allowedAgents`：允许 ACP 运行时会话的代理 id 允许列表；空表示没有额外限制。
+- `maxConcurrentSessions`：最大并发活跃 ACP 会话数。
+- `stream.coalesceIdleMs`：流式文本的空闲刷新窗口（毫秒）。
+- `stream.maxChunkChars`：拆分流式块投影前的最大块大小。
+- `stream.repeatSuppression`：抑制每轮重复的状态/工具行（默认：`true`）。
+- `stream.deliveryMode`：`"live"` 增量流式传输；`"final_only"` 缓冲直到轮次终端事件。
+- `stream.hiddenBoundarySeparator`：隐藏工具事件后可见文本之前的分隔符（默认：`"paragraph"`）。
+- `stream.maxOutputChars`：每次 ACP 轮次投影的最大助手输出字符数。
+- `stream.maxSessionUpdateChars`：投影 ACP 状态/更新行的最大字符数。
+- `stream.tagVisibility`：用于流式事件的标签名称到布尔可见性覆盖的记录。
+- `runtime.ttlMinutes`：ACP 会话工作者在符合清理条件前的空闲 TTL（分钟）。
+- `runtime.installCommand`：引导 ACP 运行时环境时运行的可选安装命令。
+
+---
+
+## CLI
+
+```json5
+{
+  cli: {
+    banner: {
+      taglineMode: "off", // random | default | off
+    },
+  },
+}
+```
+
+- `cli.banner.taglineMode` 控制横幅标语样式：
+  - `"random"`（默认）：轮换有趣/季节性标语。
+  - `"default"`：固定中性标语（`All your chats, one OpenClaw.`）。
+  - `"off"`：无标语文本（仍显示横幅标题/版本）。
+- 要隐藏整个横幅（不只是标语），设置环境变量 `OPENCLAW_HIDE_BANNER=1`。
+
+---
+
+## 向导
+
+CLI 引导设置流程（`onboard`、`configure`、`doctor`）写入的元数据：
+
+```json5
+{
+  wizard: {
+    lastRunAt: "2026-01-01T00:00:00.000Z",
+    lastRunVersion: "2026.1.4",
+    lastRunCommit: "abc1234",
+    lastRunCommand: "configure",
+    lastRunMode: "local",
+  },
+}
+```
+
+---
+
+## 身份
+
+参见[代理默认值](/gateway/config-agents#agent-defaults)下的 `agents.list` 身份字段。
+
+---
+
+## Bridge（旧版，已删除）
+
+当前构建不再包含 TCP 桥接。节点通过网关 WebSocket 连接。`bridge.*` 键不再是配置模式的一部分（在删除之前验证失败；`openclaw doctor --fix` 可以剥离未知键）。
+
+<Accordion title="旧版桥接配置（历史参考）">
+
+```json
+{
+  "bridge": {
+    "enabled": true,
+    "port": 18790,
+    "bind": "tailnet",
+    "tls": {
+      "enabled": true,
+      "autoGenerate": true
+    }
+  }
+}
+```
+
+</Accordion>
+
+---
+
+## Cron
+
+```json5
+{
+  cron: {
+    enabled: true,
+    maxConcurrentRuns: 2, // cron 调度 + 隔离的 cron 代理轮次执行
+    webhook: "https://example.invalid/legacy", // 已废弃，作为存储的 notify:true 任务的回退
+    webhookToken: "replace-with-dedicated-token", // 出站 webhook 认证的可选 bearer 令牌
+    sessionRetention: "24h", // 持续时间字符串或 false
+    runLog: {
+      maxBytes: "2mb", // 默认 2_000_000 字节
+      keepLines: 2000, // 默认 2000
+    },
+  },
+}
+```
+
+- `sessionRetention`：在从 `sessions.json` 修剪前保留已完成的隔离 cron 运行会话的时长。还控制已存档删除的 cron 转录的清理。默认：`24h`；设置 `false` 禁用。
+- `runLog.maxBytes`：修剪前每个运行日志文件（`cron/runs/<jobId>.jsonl`）的最大大小。默认：`2_000_000` 字节。
+- `runLog.keepLines`：触发运行日志修剪时保留的最新行数。默认：`2000`。
+- `webhookToken`：cron webhook POST 传递（`delivery.mode = "webhook"`）使用的 bearer 令牌，如果省略则不发送认证标头。
+- `webhook`：已废弃的旧版回退 webhook URL（http/https），仅用于仍有 `notify: true` 的存储任务。
+
+### `cron.retry`
+
+```json5
+{
+  cron: {
+    retry: {
+      maxAttempts: 3,
+      backoffMs: [30000, 60000, 300000],
+      retryOn: ["rate_limit", "overloaded", "network", "timeout", "server_error"],
+    },
+  },
+}
+```
+
+- `maxAttempts`：一次性任务在瞬态错误时的最大重试次数（默认：`3`；范围：`0`–`10`）。
+- `backoffMs`：每次重试尝试的回退延迟数组（毫秒）（默认：`[30000, 60000, 300000]`；1–10 个条目）。
+- `retryOn`：触发重试的错误类型 — `"rate_limit"`、`"overloaded"`、`"network"`、`"timeout"`、`"server_error"`。省略以重试所有瞬态类型。
+
+仅适用于一次性 cron 任务。循环任务使用单独的失败处理。
+
+### `cron.failureAlert`
+
+```json5
+{
+  cron: {
+    failureAlert: {
+      enabled: false,
+      after: 3,
+      cooldownMs: 3600000,
+      includeSkipped: false,
+      mode: "announce",
+      accountId: "main",
+    },
+  },
+}
+```
+
+- `enabled`：启用 cron 任务失败警报（默认：`false`）。
+- `after`：触发警报前的连续失败次数（正整数，最小：`1`）。
+- `cooldownMs`：同一任务重复警报之间的最小毫秒数（非负整数）。
+- `includeSkipped`：将连续跳过的运行计入警报阈值（默认：`false`）。跳过的运行单独跟踪，不影响执行错误退避。
+- `mode`：传递模式 — `"announce"` 通过渠道消息发送；`"webhook"` 发布到配置的 webhook。
+- `accountId`：用于范围警报传递的可选账户或渠道 id。
+
+### `cron.failureDestination`
+
+```json5
+{
+  cron: {
+    failureDestination: {
+      mode: "announce",
+      channel: "last",
+      to: "channel:C1234567890",
+      accountId: "main",
+    },
+  },
+}
+```
+
+- 所有任务 cron 失败通知的默认目标。
+- `mode`：`"announce"` 或 `"webhook"`；当有足够的目标数据时默认为 `"announce"`。
+- `channel`：announce 传递的渠道覆盖。`"last"` 重用最后已知的传递渠道。
+- `to`：明确的 announce 目标或 webhook URL。webhook 模式必需。
+- `accountId`：传递的可选账户覆盖。
+- 每任务 `delivery.failureDestination` 覆盖此全局默认值。
+- 当全局和每任务失败目标都未设置时，已通过 `announce` 传递的任务在失败时回退到该主要 announce 目标。
+- 除非任务的主要 `delivery.mode` 是 `"webhook"`，否则 `delivery.failureDestination` 仅支持 `sessionTarget="isolated"` 任务。
+
+参见 [Cron 任务](/automation/cron-jobs)。隔离的 cron 执行作为[后台任务](/automation/tasks)跟踪。
+
+---
+
+## 媒体模型模板变量
+
+在 `tools.media.models[].args` 中展开的模板占位符：
+
+| 变量               | 描述                                         |
+| ------------------ | -------------------------------------------- |
+| `{{Body}}`         | 完整的入站消息正文                           |
+| `{{RawBody}}`      | 原始正文（无历史/发送者包装）                |
+| `{{BodyStripped}}` | 已剥离群组提及的正文                         |
+| `{{From}}`         | 发送者标识符                                 |
+| `{{To}}`           | 目标标识符                                   |
+| `{{MessageSid}}`   | 渠道消息 id                                  |
+| `{{SessionId}}`    | 当前会话 UUID                                |
+| `{{IsNewSession}}` | 新会话创建时为 `"true"`                      |
+| `{{MediaUrl}}`     | 入站媒体伪 URL                               |
+| `{{MediaPath}}`    | 本地媒体路径                                 |
+| `{{MediaType}}`    | 媒体类型（image/audio/document/…）           |
+| `{{Transcript}}`   | 音频转录                                     |
+| `{{Prompt}}`       | CLI 条目的解析媒体提示                       |
+| `{{MaxChars}}`     | CLI 条目的解析最大输出字符数                 |
+| `{{ChatType}}`     | `"direct"` 或 `"group"`                      |
+| `{{GroupSubject}}` | 群组主题（尽力而为）                         |
+| `{{GroupMembers}}` | 群组成员预览（尽力而为）                     |
+| `{{SenderName}}`   | 发送者显示名称（尽力而为）                   |
+| `{{SenderE164}}`   | 发送者电话号码（尽力而为）                   |
+| `{{Provider}}`     | 提供商提示（whatsapp、telegram、discord 等） |
+
+---
+
+## 配置包含（`$include`）
+
+将配置拆分为多个文件：
+
+```json5
+// ~/.openclaw/openclaw.json
+{
+  gateway: { port: 18789 },
+  agents: { $include: "./agents.json5" },
+  broadcast: {
+    $include: ["./clients/mueller.json5", "./clients/schmidt.json5"],
+  },
+}
+```
+
+**合并行为：**
+
+- 单个文件：替换包含对象。
+- 文件数组：按顺序深度合并（后者覆盖前者）。
+- 兄弟键：在 include 之后合并（覆盖 included 的值）。
+- 嵌套 include：最多 10 层深。
+- 路径：相对于包含文件解析，但必须保持在顶级配置目录（`openclaw.json` 的 `dirname`）内。绝对/`../` 形式仅在它们仍解析在该边界内时允许。
+- OpenClaw 拥有的写入仅更改由单文件 include 支持的一个顶级部分时，会直接写入到该 included 文件。例如，`plugins install` 更新 `plugins: { $include: "./plugins.json5" }` 中的 `plugins.json5` 并保持 `openclaw.json` 不变。
+- 根 include、include 数组和带兄弟覆盖的 include 对 OpenClaw 拥有的写入是只读的；这些写入失败关闭而不是展平配置。
+- 错误：缺少文件、解析错误和循环 include 有清晰的错误消息。
+
+---
+
+_相关：[配置](/gateway/configuration) · [配置示例](/gateway/configuration-examples) · [Doctor](/gateway/doctor)_
+
+## 相关
+
+- [配置](/gateway/configuration)
+- [配置示例](/gateway/configuration-examples)

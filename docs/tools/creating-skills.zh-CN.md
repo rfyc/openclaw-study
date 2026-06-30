@@ -1,0 +1,115 @@
+---
+summary: "使用 SKILL.md 构建和测试自定义工作区技能"
+title: "创建技能"
+read_when:
+  - 您正在工作区中创建新的自定义技能
+  - 您需要基于 SKILL.md 的技能的快速入门工作流
+---
+
+技能教导代理如何以及何时使用工具。每个技能是一个包含带有 YAML frontmatter 和 Markdown 说明的 `SKILL.md` 文件的目录。
+
+有关技能如何加载和优先排序，请参阅[技能](/tools/skills)。
+
+## 创建您的第一个技能
+
+<Steps>
+  <Step title="创建技能目录">
+    技能存放在您的工作区中。创建一个新文件夹：
+
+    ```bash
+    mkdir -p ~/.openclaw/workspace/skills/hello-world
+    ```
+
+  </Step>
+
+  <Step title="编写 SKILL.md">
+    在该目录中创建 `SKILL.md`。frontmatter 定义元数据，Markdown 正文包含代理的说明。
+
+    ```markdown
+    ---
+    name: hello-world
+    description: A simple skill that says hello.
+    ---
+
+    # Hello World Skill
+
+    When the user asks for a greeting, use the `echo` tool to say
+    "Hello from your custom skill!".
+    ```
+
+    技能 `name` 请使用连字符格式，包含小写字母、数字和连字符。保持文件夹名称和 frontmatter `name` 对齐。
+
+  </Step>
+
+  <Step title="添加工具（可选）">
+    您可以在 frontmatter 中定义自定义工具模式，或指示代理使用现有的系统工具（如 `exec` 或 `browser`）。技能也可以与其记录的工具一起在插件内部分发。
+
+  </Step>
+
+  <Step title="加载技能">
+    开始一个新会话，以便 OpenClaw 加载该技能：
+
+    ```bash
+    # 从聊天中
+    /new
+
+    # 或重启 Gateway
+    openclaw gateway restart
+    ```
+
+    验证技能已加载：
+
+    ```bash
+    openclaw skills list
+    ```
+
+  </Step>
+
+  <Step title="测试">
+    发送应该触发技能的消息：
+
+    ```bash
+    openclaw agent --message "give me a greeting"
+    ```
+
+    或者只是与代理聊天并请求问候。
+
+  </Step>
+</Steps>
+
+## 技能元数据参考
+
+YAML frontmatter 支持以下字段：
+
+| 字段                                | 必填 | 描述                                           |
+| ----------------------------------- | ---- | ---------------------------------------------- |
+| `name`                              | 是   | 使用小写字母、数字和连字符的唯一标识符         |
+| `description`                       | 是   | 显示给代理的单行描述                           |
+| `metadata.openclaw.os`              | 否   | 操作系统过滤器（`["darwin"]`、`["linux"]` 等） |
+| `metadata.openclaw.requires.bins`   | 否   | PATH 上所需的二进制文件                        |
+| `metadata.openclaw.requires.config` | 否   | 所需的配置键                                   |
+
+## 最佳实践
+
+- **保持简洁** — 指导模型做*什么*，而不是如何成为 AI
+- **安全第一** — 如果您的技能使用 `exec`，确保提示不允许来自不受信任输入的任意命令注入
+- **本地测试** — 在分享之前使用 `openclaw agent --message "..."` 进行测试
+- **使用 ClawHub** — 在 [ClawHub](https://clawhub.ai) 上浏览和贡献技能
+
+## 技能存放位置
+
+| 位置                            | 优先级 | 范围             |
+| ------------------------------- | ------ | ---------------- |
+| `\<workspace\>/skills/`         | 最高   | 每代理           |
+| `\<workspace\>/.agents/skills/` | 高     | 每工作区代理     |
+| `~/.agents/skills/`             | 中     | 共享代理配置文件 |
+| `~/.openclaw/skills/`           | 中     | 共享（所有代理） |
+| 捆绑（随 OpenClaw 分发）        | 低     | 全局             |
+| `skills.load.extraDirs`         | 最低   | 自定义共享文件夹 |
+
+## 相关
+
+- [技能参考](/tools/skills) — 加载、优先级和控制规则
+- [技能配置](/tools/skills-config) — `skills.*` 配置模式
+- [ClawHub](/tools/clawhub) — 公共技能注册表
+- [构建插件](/plugins/building-plugins) — 插件可以分发技能

@@ -379,6 +379,46 @@ export function renderChatControls(state: AppViewState) {
         ${toolCallsIcon}
       </button>
       <button
+        class="btn btn--sm btn--icon"
+        @click=${async () => {
+          const s = state as unknown as {
+            debugModalOpen: boolean;
+            debugCaptureLoading: boolean;
+            debugCaptureEvents: unknown[];
+            debugCaptureError: string | null;
+            client: import("./gateway.ts").GatewayBrowserClient | null;
+          };
+          s.debugModalOpen = true;
+          s.debugCaptureLoading = true;
+          s.debugCaptureError = null;
+          try {
+            const { loadDebugCaptureEvents } = await import("./chat/debug-modal.ts");
+            const result = await loadDebugCaptureEvents(s.client);
+            s.debugCaptureEvents = result.events;
+            s.debugCaptureError = result.error;
+          } finally {
+            s.debugCaptureLoading = false;
+          }
+        }}
+        title="Debug"
+        aria-label="Debug"
+        data-tooltip="Debug"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+      </button>
+      <button
         class="btn btn--sm btn--icon ${focusActive ? "active" : ""}"
         ?disabled=${disableFocusToggle}
         @click=${() => {

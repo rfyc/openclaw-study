@@ -14,6 +14,24 @@ import {
   isMissingOperatorReadScopeError,
 } from "./scope-errors.ts";
 
+type DebugFrameHost = {
+  debugFrames?: Array<{ direction: "out" | "in"; ts: number; data: unknown }>;
+};
+
+function pushDebugFrame(state: unknown, direction: "out" | "in", data: unknown) {
+  const host = state as DebugFrameHost;
+  if (Array.isArray(host.debugFrames)) {
+    host.debugFrames = [...host.debugFrames, { direction, ts: Date.now(), data }];
+  }
+}
+
+function clearDebugFrames(state: unknown) {
+  const host = state as DebugFrameHost;
+  if (Array.isArray(host.debugFrames)) {
+    host.debugFrames = [];
+  }
+}
+
 const HEARTBEAT_TOKEN = "HEARTBEAT_OK";
 const SILENT_REPLY_PATTERN = /^\s*NO_REPLY\s*$/;
 const DEFAULT_HEARTBEAT_ACK_MAX_CHARS = 300;
@@ -631,6 +649,12 @@ export async function sendChatMessage(
   state.chatStream = "";
   state.chatStreamStartedAt = now;
 
+  clearDebugFrames(state);
+  pushDebugFrame(state, "out", {
+    method: "chat.send",
+    params: { sessionKey: state.sessionKey, message: msg, runId },
+  });
+
   try {
     await requestChatSend(state, { message: msg, attachments, runId });
     return runId;
@@ -731,6 +755,8 @@ export function handleChatEvent(state: ChatState, payload?: ChatEventPayload) {
   if (!sessionMatches && !activeRunMatches) {
     return null;
   }
+
+  pushDebugFrame(state, "in", { event: "chat", state: payload.state, payload });
 
   // Terminal events for the active client run carry runId; missing-runId events are unowned.
   // Final from another run (e.g. sub-agent announce): refresh history to show new message.
