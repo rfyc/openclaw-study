@@ -2498,8 +2498,8 @@ export function renderApp(state: AppViewState) {
           open: state.debugModalOpen,
           frames: state.debugFrames,
           captureEvents: state.debugCaptureEvents,
-          captureLoading: state.debugCaptureLoading,
-          captureError: state.debugCaptureError,
+          captureLoading: false,
+          captureError: null,
           onClose: () => {
             state.debugModalOpen = false;
           },

@@ -23,6 +23,7 @@ const EVENT_SCOPE_GUARDS: Record<string, string[]> = {
   chat: [READ_SCOPE],
   "chat.side_result": [READ_SCOPE],
   cron: [READ_SCOPE],
+  "debug.llm": [READ_SCOPE],
   health: [],
   "exec.approval.requested": [APPROVALS_SCOPE],
   "exec.approval.resolved": [APPROVALS_SCOPE],

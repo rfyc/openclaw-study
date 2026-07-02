@@ -380,25 +380,12 @@ export function renderChatControls(state: AppViewState) {
       </button>
       <button
         class="btn btn--sm btn--icon"
-        @click=${async () => {
+        @click=${() => {
           const s = state as unknown as {
             debugModalOpen: boolean;
-            debugCaptureLoading: boolean;
             debugCaptureEvents: unknown[];
-            debugCaptureError: string | null;
-            client: import("./gateway.ts").GatewayBrowserClient | null;
           };
           s.debugModalOpen = true;
-          s.debugCaptureLoading = true;
-          s.debugCaptureError = null;
-          try {
-            const { loadDebugCaptureEvents } = await import("./chat/debug-modal.ts");
-            const result = await loadDebugCaptureEvents(s.client);
-            s.debugCaptureEvents = result.events;
-            s.debugCaptureError = result.error;
-          } finally {
-            s.debugCaptureLoading = false;
-          }
         }}
         title="Debug"
         aria-label="Debug"

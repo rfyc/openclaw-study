@@ -5,6 +5,7 @@ import type { AgentMessage } from "@mariozechner/pi-agent-core";
 import { CURRENT_SESSION_VERSION } from "@mariozechner/pi-coding-agent";
 import { resolveSendableOutboundReplyParts } from "openclaw/plugin-sdk/reply-payload";
 import { resolveAgentWorkspaceDir, resolveSessionAgentId } from "../../agents/agent-scope.js";
+import { setDebugSessionId, setLlmDebugBroadcast } from "../../agents/llm-debug-buffer.js";
 import { rewriteTranscriptEntriesInSessionFile } from "../../agents/pi-embedded-runner/transcript-rewrite.js";
 import { ensureSandboxWorkspaceForSession } from "../../agents/sandbox/context.js";
 import { resolveAgentTimeoutMs } from "../../agents/timeout.js";
@@ -2430,6 +2431,8 @@ export const chatHandlers: GatewayRequestHandlers = {
       });
 
       let agentRunStarted = false;
+      setDebugSessionId(clientRunId);
+      setLlmDebugBroadcast((event, payload) => context.broadcast(event, payload));
       void dispatchInboundMessage({
         ctx,
         cfg,
@@ -2686,6 +2689,8 @@ export const chatHandlers: GatewayRequestHandlers = {
         .finally(() => {
           activeRunAbort.cleanup();
           context.removeChatRun(clientRunId, clientRunId, sessionKey);
+          setDebugSessionId(undefined);
+          setLlmDebugBroadcast(null);
         });
     } catch (err) {
       context.chatAbortControllers.delete(clientRunId);

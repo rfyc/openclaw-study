@@ -27,8 +27,8 @@ setup: node_modules/.modules.yaml
 # make dev 自动完成：安装依赖 → 初始化配置 → 启动热重载 → 打开浏览器
 dev: node_modules/.modules.yaml
 	pnpm openclaw setup
-	@(sleep 7 && open "http://127.0.0.1:$${OPENCLAW_GATEWAY_PORT:-18789}/?token=$$(node -e "process.stdout.write(require(require('os').homedir()+'/.openclaw/openclaw.json').gateway.auth.token)")") &
-	OPENCLAW_DEBUG_PROXY_ENABLED=1 pnpm gateway:watch:raw
+	@(sleep 10 && open "http://127.0.0.1:$${OPENCLAW_GATEWAY_PORT:-18789}/?token=$$(node -e "process.stdout.write(require(require('os').homedir()+'/.openclaw/openclaw.json').gateway.auth.token)")") &
+	pnpm gateway:watch:raw
 
 # 传参运行，例: make run ARGS="--help"
 run:

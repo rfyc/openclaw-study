@@ -725,6 +725,18 @@ function handleGatewayEventUnsafe(host: GatewayHost, evt: GatewayEventFrame) {
     return;
   }
 
+  if (evt.event === "debug.llm") {
+    const debugHost = host as unknown as {
+      debugCaptureEvents: unknown[];
+      debugModalOpen: boolean;
+    };
+    const payload = evt.payload as { kind?: string; debugSessionId?: string } | undefined;
+    if (payload) {
+      debugHost.debugCaptureEvents = [...debugHost.debugCaptureEvents, payload];
+    }
+    return;
+  }
+
   if (evt.event === "session.message") {
     handleSessionMessageGatewayEvent(host, evt.payload as { sessionKey?: string } | undefined);
     return;
