@@ -149,6 +149,9 @@ package-lock.json
 !.claude/chat-history/
 !.claude/chat-history/**
 !.claude/restore-history.sh
+!.claude/sanitize-history.sh
+!.claude/skills/
+!.claude/skills/**
 .agent/
 skills-lock.json
 
